@@ -16,6 +16,11 @@ def diagnose_issues(namespace: str = "default") -> dict:
     """
     Diagnose common cluster issues and failed pods with recommendations.
     
+    Provides intelligent cluster issue detection including:
+    - Failed and pending pod identification
+    - Root cause analysis and troubleshooting recommendations
+    - Professional diagnostic reporting with actionable insights
+    
     Args:
         namespace (str): Kubernetes namespace to diagnose (default: "default")
         
@@ -23,9 +28,13 @@ def diagnose_issues(namespace: str = "default") -> dict:
         dict: Formatted diagnostics report with issue details and recommendations
     """
     try:
+        # === ISSUE DETECTION ===
+        # Scan all pods for failed or problematic states
         pods = k8s_v1.list_namespaced_pod(namespace)
-        issues = []
+        issues = []  # List to store identified issues
         
+        # === POD ISSUE ANALYSIS ===
+        # Identify pods in problematic states and extract failure reasons
         for pod in pods.items:
             if pod.status.phase in ["Failed", "Pending"]:
                 issues.append({

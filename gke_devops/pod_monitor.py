@@ -18,6 +18,12 @@ def get_pod_status(namespace: str = "default") -> dict:
     """
     Get detailed pod status in specified namespace with comprehensive metrics.
     
+    Provides detailed pod monitoring including:
+    - Container readiness and restart count tracking
+    - Pod age calculation and node assignment details
+    - Health percentage scoring and status categorization
+    - Professional dashboard with detailed pod information
+    
     Args:
         namespace (str): Kubernetes namespace to monitor (default: "default")
         
@@ -25,15 +31,20 @@ def get_pod_status(namespace: str = "default") -> dict:
         dict: Formatted pod status dashboard with health summary and detailed pod info
     """
     try:
+        # === POD DATA COLLECTION ===
+        # Fetch all pods in the specified namespace
         pods = k8s_v1.list_namespaced_pod(namespace)
-        pod_stats = {}
-        pod_details = []
+        pod_stats = {}      # Pod status statistics by phase
+        pod_details = []    # Detailed information for each pod
         
+        # === POD ANALYSIS LOOP ===
+        # Process each pod to extract detailed metrics and status information
         for pod in pods.items:
             phase = pod.status.phase
             pod_stats[phase] = pod_stats.get(phase, 0) + 1
             
-            # Get detailed pod info
+            # === CONTAINER METRICS EXTRACTION ===
+            # Calculate container readiness and restart statistics
             ready_containers = 0
             total_containers = len(pod.spec.containers) if pod.spec.containers else 0
             restart_count = 0
@@ -42,7 +53,8 @@ def get_pod_status(namespace: str = "default") -> dict:
                 ready_containers = sum(1 for c in pod.status.container_statuses if c.ready)
                 restart_count = sum(c.restart_count for c in pod.status.container_statuses)
             
-            # Get pod age
+            # === POD AGE CALCULATION ===
+            # Calculate how long the pod has been running
             if pod.metadata.creation_timestamp:
                 age = datetime.datetime.now(datetime.timezone.utc) - pod.metadata.creation_timestamp
                 age_str = f"{age.days}d" if age.days > 0 else f"{age.seconds//3600}h{(age.seconds%3600)//60}m"
@@ -77,7 +89,8 @@ def get_pod_status(namespace: str = "default") -> dict:
         if len(pod_details) > 10:
             pod_list += f"\n   📋 ... and {len(pod_details) - 10} more pods"
         
-        # Calculate health percentage
+        # === HEALTH SCORING CALCULATION ===
+        # Calculate overall pod health percentage based on running pods
         running_pods = pod_stats.get('Running', 0)
         health_percentage = (running_pods / len(pod_details) * 100) if len(pod_details) > 0 else 100
         

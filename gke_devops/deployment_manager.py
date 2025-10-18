@@ -16,6 +16,11 @@ def list_deployments(namespace: str = "default") -> dict:
     """
     List all deployments in the specified namespace with status details.
     
+    Provides comprehensive deployment monitoring including:
+    - Replica status tracking and readiness verification
+    - Deployment health assessment and status reporting
+    - Professional formatting for deployment overview
+    
     Args:
         namespace (str): Kubernetes namespace to scan (default: "default")
         
@@ -23,9 +28,13 @@ def list_deployments(namespace: str = "default") -> dict:
         dict: Formatted deployment report with replica counts and status
     """
     try:
+        # === DEPLOYMENT DATA COLLECTION ===
+        # Fetch all deployments in the specified namespace
         deployments = k8s_apps_v1.list_namespaced_deployment(namespace)
-        deployment_list = []
+        deployment_list = []  # List to store deployment information
         
+        # === DEPLOYMENT ANALYSIS ===
+        # Process each deployment to extract replica status and health information
         for dep in deployments.items:
             deployment_list.append({
                 "name": dep.metadata.name,
