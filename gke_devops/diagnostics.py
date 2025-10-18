@@ -11,6 +11,7 @@ Author: GKE DevOps Team
 """
 
 from .config import k8s_v1
+from kubernetes.client.exceptions import ApiException
 
 def diagnose_issues(namespace: str = "default") -> dict:
     """
@@ -28,42 +29,53 @@ def diagnose_issues(namespace: str = "default") -> dict:
         dict: Formatted diagnostics report with issue details and recommendations
     """
     try:
-        # === ISSUE DETECTION ===
-        # Scan all pods for failed or problematic states
         pods = k8s_v1.list_namespaced_pod(namespace)
-        issues = []  # List to store identified issues
-        
-        # === POD ISSUE ANALYSIS ===
-        # Identify pods in problematic states and extract failure reasons
+        issues = []
+
         for pod in pods.items:
-            if pod.status.phase in ["Failed", "Pending"]:
-                issues.append({
-                    "pod": pod.metadata.name,
-                    "status": pod.status.phase,
-                    "reason": pod.status.reason or "Unknown",
-                    "command": f"kubectl describe pod {pod.metadata.name} -n {namespace}"
-                })
-        
-        issue_details = ""
-        if issues:
-            status_icon = "🔴"
-            issue_list = []
-            for issue in issues:
-                issue_list.append(f"Pod    : {issue['pod']} ({issue['status']})")
-                issue_list.append(f"Reason : {issue['reason']}")
-                issue_list.append(f"Action : {issue['command']}\n")
-            issue_details = "```\n" + "\n".join(issue_list) + "```"
+            if pod.status.phase not in ["Running", "Succeeded"]:
+                reason = pod.status.reason
+                message = pod.status.message
+                details = f"Pod is {pod.status.phase}."
+
+                if pod.status.container_statuses:
+                    for cs in pod.status.container_statuses:
+                        if cs.state.waiting:
+                            reason = cs.state.waiting.reason
+                            message = cs.state.waiting.message
+                            details = f"Container {cs.name} is waiting: {reason} - {message}"
+                            break
+                        if cs.state.terminated:
+                            reason = cs.state.terminated.reason
+                            message = cs.state.terminated.message
+                            details = f"Container {cs.name} terminated: {reason} (Exit code: {cs.state.terminated.exit_code}) - {message}"
+                            break
+                
+                issues.append(
+                    f"{pod.metadata.name:<40} {pod.status.phase:<12} {reason:<20} {details}"
+                )
+
+        if not issues:
+            issue_details = "No issues detected. All pods are healthy! 🎉"
+            count = 0
         else:
-            status_icon = "✅"
-            issue_details = "No issues detected. All pods are healthy! 🎉\n"
-            
+            issue_details = chr(10).join(issues)
+            count = len(issues)
+
         return {
             "status": "success",
             "formatted_response": f"""
-🔍 **Cluster Diagnostics Report - {namespace} namespace**
-{status_icon} **Issues Found**: {len(issues)}
+🔍 **Cluster Diagnostics - {namespace}**
+
+**{count} issues found.**
+
+```
+NAME                                     STATUS       REASON               DETAILS
 {issue_details}
+```
             """
         }
+    except ApiException as e:
+        return {"status": "error", "error_message": f"Kubernetes API error: {e.reason}"}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}

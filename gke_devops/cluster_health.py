@@ -12,6 +12,7 @@ Author: GKE DevOps Team
 """
 
 from .config import k8s_v1
+from kubernetes.client.exceptions import ApiException
 
 def check_cluster_health() -> dict:
     """
@@ -28,63 +29,55 @@ def check_cluster_health() -> dict:
     """
     try:
         # === NODE HEALTH ASSESSMENT ===
-        # Fetch all cluster nodes and evaluate their readiness status
         nodes = k8s_v1.list_node()
-        ready_nodes = sum(1 for node in nodes.items 
-                         if any(c.type == "Ready" and c.status == "True" 
-                               for c in node.status.conditions))
+        ready_nodes = sum(1 for n in nodes.items if any(c.type == "Ready" and c.status == "True" for c in n.status.conditions))
         
         # === POD HEALTH METRICS ===
-        # Analyze pod status across all namespaces for cluster-wide health
         pods = k8s_v1.list_pod_for_all_namespaces()
-        running_pods = sum(1 for pod in pods.items if pod.status.phase == "Running")
-        failed_pods = sum(1 for pod in pods.items if pod.status.phase == "Failed")
-        pending_pods = sum(1 for pod in pods.items if pod.status.phase == "Pending")
-        pod_efficiency = (running_pods / len(pods.items) * 100) if len(pods.items) > 0 else 100
+        pod_phases = [p.status.phase for p in pods.items]
+        running_pods = pod_phases.count("Running")
+        failed_pods = pod_phases.count("Failed")
+        pending_pods = pod_phases.count("Pending")
         
-        # === NODE DETAILED INFORMATION ===
-        # Extract detailed node information including readiness and Kubernetes version
-        node_details = []
-        for node in nodes.items:
-            node_ready = any(c.type == "Ready" and c.status == "True" for c in node.status.conditions)
-            node_details.append({
-                "name": node.metadata.name,
-                "ready": "✅" if node_ready else "❌",
-                "version": node.status.node_info.kubelet_version
-            })
-        
+        total_pods = len(pods.items)
+        pod_health_percentage = (running_pods / total_pods * 100) if total_pods > 0 else 100
+
         # === CLUSTER STATUS DETERMINATION ===
-        # Determine overall cluster health status based on pod conditions
-        if failed_pods == 0 and pending_pods == 0:
-            detailed_status = "🟢 **EXCELLENT** - All systems operational"
-        elif failed_pods == 0 and pending_pods > 0:
-            detailed_status = f"🟡 **GOOD** - {pending_pods} pods pending startup"
+        if failed_pods > 0:
+            cluster_status = f"🔴 ATTENTION: {failed_pods} failed pod(s) detected."
+        elif pending_pods > 0:
+            cluster_status = f"🟡 PENDING: {pending_pods} pod(s) are pending."
         else:
-            detailed_status = f"🔴 **ATTENTION** - {failed_pods} failed, {pending_pods} pending"
+            cluster_status = "🟢 EXCELLENT: All systems operational."
+
+        # === NODE DETAILS ===
+        node_lines = []
+        for node in nodes.items:
+            status = "✅ Ready" if any(c.type == "Ready" and c.status == "True" for c in node.status.conditions) else "❌ NotReady"
+            node_lines.append(f"- {node.metadata.name} ({status})")
         
         return {
             "status": "success",
             "formatted_response": f"""
-🏥 **GKE Cluster Health Dashboard**
-{detailed_status}
+🏥 **GKE Cluster Health Report**
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**{cluster_status}**
 
-```
-┌──────────────────────────────┬──────────────────────────────┐
-│ 🖥️ INFRASTRUCTURE            │ 🚀 WORKLOADS                 │
-├──────────────────────────────┼──────────────────────────────┤
-│ Nodes     : {ready_nodes} / {len(nodes.items)} Ready      │ Pods      : {running_pods} / {len(pods.items)} Running   │
-│ Uptime    : {pod_efficiency:.0f}%                  │ Running   : {running_pods}                   │
-│ Density   : {(len(pods.items)/len(nodes.items)):.1f} pods/node     │ Pending   : {pending_pods}                   │
-│                               │ Failed    : {failed_pods}                   │
-└──────────────────────────────┴──────────────────────────────┘
-```
-Node Details:
-```
-{"\n".join([f"  • {node['name']} ({node['version']}) - {node['ready']}" for node in node_details])}
-```
+**Summary:**
+- **Nodes:** {ready_nodes}/{len(nodes.items)} Ready
+- **Pods:** {running_pods}/{total_pods} Running
+- **Health:** {pod_health_percentage:.0f}% Pods Healthy
+
+**Node Status:**
+{chr(10).join(node_lines)}
+
+**Workload Status:**
+- **Running:** {running_pods}
+- **Pending:** {pending_pods}
+- **Failed:** {failed_pods}
             """
         }
+    except ApiException as e:
+        return {"status": "error", "error_message": f"Kubernetes API error: {e.reason}"}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}

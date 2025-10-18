@@ -11,6 +11,8 @@ Author: GKE DevOps Team
 """
 
 from .config import k8s_apps_v1
+from kubernetes.client.exceptions import ApiException
+import datetime
 
 def list_deployments(namespace: str = "default") -> dict:
     """
@@ -28,41 +30,42 @@ def list_deployments(namespace: str = "default") -> dict:
         dict: Formatted deployment report with replica counts and status
     """
     try:
-        # === DEPLOYMENT DATA COLLECTION ===
-        # Fetch all deployments in the specified namespace
         deployments = k8s_apps_v1.list_namespaced_deployment(namespace)
-        deployment_list = []  # List to store deployment information
         
-        # === DEPLOYMENT ANALYSIS ===
-        # Process each deployment to extract replica status and health information
+        deployment_lines = []
         for dep in deployments.items:
-            deployment_list.append({
-                "name": dep.metadata.name,
-                "ready": f"{dep.status.ready_replicas or 0}/{dep.spec.replicas}",
-                "status": "✅ Ready" if dep.status.ready_replicas == dep.spec.replicas else "🔄 Updating"
-            })
-            
-        # Create a formatted table
-        headers = ["STATUS", "DEPLOYMENT", "REPLICAS"]
-        deploy_table = [headers]
-        for d in deployment_list:
-            deploy_table.append([d['status'], d['name'], d['ready']])
+            age = "Unknown"
+            if dep.metadata.creation_timestamp:
+                delta = datetime.datetime.now(datetime.timezone.utc) - dep.metadata.creation_timestamp
+                if delta.days > 0:
+                    age = f"{delta.days}d"
+                else:
+                    age = f"{delta.seconds // 3600}h"
 
-        # Simple column alignment
-        deploy_details = "\n".join(["  ".join(f"{item:<{max(len(str(row[i])) for row in deploy_table) + 2}}" for i, item in enumerate(row))) for row in deploy_table])
+            deployment_lines.append(
+                f"{dep.metadata.name:<25} {dep.status.ready_replicas or 0}/{dep.spec.replicas:<5} "
+                f"{dep.status.updated_replicas or 0:<12} {dep.status.available_replicas or 0:<11} {age}"
+            )
 
-        if not deployment_list:
-            deploy_details = "No deployments found in this namespace."
-            
+        if not deployments.items:
+            deployment_details = "No deployments found in this namespace."
+        else:
+            deployment_details = chr(10).join(deployment_lines)
+
         return {
             "status": "success",
             "formatted_response": f"""
-🚀 **Deployments Report - {namespace} namespace**
-Total Deployments: {len(deployment_list)}
+🚀 **Deployments Report - {namespace}**
+
+**Total Deployments: {len(deployments.items)}**
+
 ```
-{deploy_details}
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+{deployment_details}
 ```
             """
         }
+    except ApiException as e:
+        return {"status": "error", "error_message": f"Kubernetes API error: {e.reason}"}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}
