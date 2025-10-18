@@ -81,14 +81,15 @@ def get_pod_status(namespace: str = "default") -> dict:
             })
         
         # Enhanced pod list
-        pod_list = "\n".join([
-            f"   {pod['icon']} **{pod['name']}**\n      └─ Status: {pod['phase']} | Ready: {pod['ready']} | Restarts: {pod['restarts']} | Age: {pod['age']} | Node: {pod['node']}"
-            for pod in pod_details[:10]
-        ])
+        # Create a formatted table for pod details
+        headers = ["STATUS", "NAME", "READY", "RESTARTS", "AGE", "NODE"]
+        pod_table = [headers]
+        for p in pod_details[:10]:
+            pod_table.append([p['icon'], p['name'], p['ready'], str(p['restarts']), p['age'], p['node']])
         
-        if len(pod_details) > 10:
-            pod_list += f"\n   📋 ... and {len(pod_details) - 10} more pods"
-        
+        # Simple column alignment
+        pod_list = "\n".join(["  ".join(f"{item:<{max(len(str(row[i])) for row in pod_table) + 2}}" for i, item in enumerate(row))) for row in pod_table])
+
         # === HEALTH SCORING CALCULATION ===
         # Calculate overall pod health percentage based on running pods
         running_pods = pod_stats.get('Running', 0)
@@ -112,27 +113,16 @@ def get_pod_status(namespace: str = "default") -> dict:
             "status": "success",
             "formatted_response": f"""
 📦 **Pod Status Dashboard - {namespace} namespace**
-
 {overall_status}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 **Pod Health Summary**:
-   📈 **Health Score**: {health_percentage:.0f}%
-   🔢 **Total Pods**: {len(pod_details)}
-{chr(10).join(status_summary)}
+`Health: {health_percentage:.0f}%` | `Total: {len(pod_details)}` | `Running: {pod_stats.get('Running', 0)}` | `Pending: {pod_stats.get('Pending', 0)}` | `Failed: {pod_stats.get('Failed', 0)}`
 
-🚀 **Detailed Pod Status** (showing first 10):
+```
 {pod_list}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-💡 **Quick Insights**:
-   • Pod Density: {len(pod_details)} workloads in {namespace}
-   • Restart Activity: {sum(pod['restarts'] for pod in pod_details)} total restarts
-   • Health Status: {health_percentage:.0f}% operational
-
-🎯 **Recommendation**: {"🎉 All pods are running smoothly!" if health_percentage == 100 else "⚠️ Monitor non-running pods for issues"}
+```
+{"... and " + str(len(pod_details) - 10) + " more pods" if len(pod_details) > 10 else ""}
             """
         }
     except Exception as e:

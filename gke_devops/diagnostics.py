@@ -38,31 +38,31 @@ def diagnose_issues(namespace: str = "default") -> dict:
         for pod in pods.items:
             if pod.status.phase in ["Failed", "Pending"]:
                 issues.append({
-                    "pod_name": pod.metadata.name,
-                    "phase": pod.status.phase,
-                    "reason": pod.status.reason or "Unknown"
+                    "pod": pod.metadata.name,
+                    "status": pod.status.phase,
+                    "reason": pod.status.reason or "Unknown",
+                    "command": f"kubectl describe pod {pod.metadata.name} -n {namespace}"
                 })
         
+        issue_details = ""
         if issues:
-            issue_details = "\n".join([f"   • {issue['pod_name']}: {issue['phase']} - {issue['reason']}" for issue in issues])
             status_icon = "🔴"
-            recommendation = "🔍 **Recommendation**: Check pod logs and events for detailed troubleshooting"
+            issue_list = []
+            for issue in issues:
+                issue_list.append(f"Pod    : {issue['pod']} ({issue['status']})")
+                issue_list.append(f"Reason : {issue['reason']}")
+                issue_list.append(f"Action : {issue['command']}\n")
+            issue_details = "```\n" + "\n".join(issue_list) + "```"
         else:
-            issue_details = "   • No issues detected - all pods are healthy! 🎉"
             status_icon = "✅"
-            recommendation = "🎉 **Great news**: Your cluster is running smoothly!"
+            issue_details = "No issues detected. All pods are healthy! 🎉\n"
             
         return {
             "status": "success",
             "formatted_response": f"""
 🔍 **Cluster Diagnostics Report - {namespace} namespace**
-
 {status_icon} **Issues Found**: {len(issues)}
-
-📊 **Issue Details**:
 {issue_details}
-
-{recommendation}
             """
         }
     except Exception as e:

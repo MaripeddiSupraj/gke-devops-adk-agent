@@ -18,7 +18,7 @@ def initialize_k8s_clients():
     then falls back to local kubeconfig for development/external access.
     
     Returns:
-        tuple: (CoreV1Api, AppsV1Api) - Kubernetes API client instances
+        tuple: (CoreV1Api, AppsV1Api, NetworkingV1Api) - Kubernetes API client instances
     """
     try:
         # Try in-cluster config first (when running inside Kubernetes)
@@ -27,8 +27,8 @@ def initialize_k8s_clients():
         # Fall back to local kubeconfig (for development/external access)
         config.load_kube_config()
     
-    return client.CoreV1Api(), client.AppsV1Api()
+    return client.CoreV1Api(), client.AppsV1Api(), client.NetworkingV1Api()
 
 # === GLOBAL CLIENT INITIALIZATION ===
 # Initialize Kubernetes API clients for use across all modules
-k8s_v1, k8s_apps_v1 = initialize_k8s_clients()
+k8s_v1, k8s_apps_v1, k8s_networking_v1 = initialize_k8s_clients()

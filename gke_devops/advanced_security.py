@@ -12,6 +12,17 @@ from .config import k8s_v1, k8s_apps_v1
 import re
 import json
 
+# === CONSTANTS FOR SECURITY CHECKS ===
+# Heuristic patterns for known vulnerable or end-of-life (EOL) base images.
+# This list can be updated as new advisories are released.
+VULNERABLE_IMAGE_PATTERNS = [
+    r'ubuntu:16\.04',  # EOL Ubuntu
+    r'centos:7',       # EOL CentOS
+    r'alpine:3\.[0-7]', # Old Alpine versions
+    r'node:10',        # EOL Node.js
+    r'python:2\.7'     # EOL Python
+]
+
 def advanced_security_scan(namespace: str = "default") -> dict:
     """
     Perform advanced security analysis including CVE scanning and compliance checks.
@@ -52,15 +63,7 @@ def advanced_security_scan(namespace: str = "default") -> dict:
                     image = container.image
                     
                     # Check for known vulnerable base images (heuristic)
-                    vulnerable_patterns = [
-                        r'ubuntu:16\.04',  # EOL Ubuntu
-                        r'centos:7',       # EOL CentOS
-                        r'alpine:3\.[0-7]', # Old Alpine versions
-                        r'node:10',        # EOL Node.js
-                        r'python:2\.7'     # EOL Python
-                    ]
-                    
-                    for pattern in vulnerable_patterns:
+                    for pattern in VULNERABLE_IMAGE_PATTERNS:
                         if re.search(pattern, image):
                             image_vulnerabilities.append({
                                 "pod": pod.metadata.name,
@@ -110,19 +113,20 @@ def advanced_security_scan(namespace: str = "default") -> dict:
         # Assess service account permissions and RBAC configurations
         rbac_issues = []
         try:
-            # Get service accounts
+            # Get service accounts and roles
             service_accounts = k8s_v1.list_namespaced_service_account(namespace)
-            
+
             # Check for overprivileged service accounts
             for sa in service_accounts.items:
                 if sa.metadata.name != "default":
                     # This is a simplified check - in production, analyze actual RBAC bindings
                     rbac_issues.append({
                         "service_account": sa.metadata.name,
-                        "recommendation": "Review RBAC permissions for least privilege"
+                        "recommendation": "Review RBAC bindings for least privilege"
                     })
-        except:
-            pass
+        except Exception as e:
+            # This might fail due to lack of permissions to list roles/bindings
+            rbac_issues.append({"service_account": "N/A", "recommendation": f"Could not perform RBAC analysis: {e}"})
         
         # === 4. SECRETS MANAGEMENT SECURITY ANALYSIS ===
         # Evaluate secrets usage and potential exposure risks

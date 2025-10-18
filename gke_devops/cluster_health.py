@@ -62,38 +62,28 @@ def check_cluster_health() -> dict:
         else:
             detailed_status = f"🔴 **ATTENTION** - {failed_pods} failed, {pending_pods} pending"
         
-        node_list = "\n".join([f"      • {node['name']}: {node['ready']} {node['version']}" for node in node_details])
-        
         return {
             "status": "success",
             "formatted_response": f"""
 🏥 **GKE Cluster Health Dashboard**
-
 {detailed_status}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🖥️ **Infrastructure Status**
-   📍 **Nodes**: {ready_nodes}/{len(nodes.items)} ready ({(ready_nodes/len(nodes.items)*100):.0f}%)
-   🔧 **Node Details**:
-{node_list}
-
-🚀 **Workload Status**
-   📊 **Pod Health**: {pod_efficiency:.0f}% operational
-   ✅ **Running**: {running_pods} pods
-   ⏳ **Pending**: {pending_pods} pods
-   ❌ **Failed**: {failed_pods} pods
-   📈 **Total Workloads**: {len(pods.items)} pods
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-💡 **Quick Insights**:
-   • Cluster Utilization: {len(pods.items)} pods across {len(nodes.items)} node(s)
-   • Average Pod Density: {(len(pods.items)/len(nodes.items)):.1f} pods per node
-   • System Reliability: {pod_efficiency:.0f}% uptime
-   • Infrastructure: {'Single-node setup' if len(nodes.items) == 1 else f'{len(nodes.items)}-node cluster'}
-
-🎯 **Status**: {"🎉 Your cluster is performing optimally!" if failed_pods == 0 and pending_pods == 0 else "⚠️ Monitor pending/failed pods for optimal performance"}
+```
+┌──────────────────────────────┬──────────────────────────────┐
+│ 🖥️ INFRASTRUCTURE            │ 🚀 WORKLOADS                 │
+├──────────────────────────────┼──────────────────────────────┤
+│ Nodes     : {ready_nodes} / {len(nodes.items)} Ready      │ Pods      : {running_pods} / {len(pods.items)} Running   │
+│ Uptime    : {pod_efficiency:.0f}%                  │ Running   : {running_pods}                   │
+│ Density   : {(len(pods.items)/len(nodes.items)):.1f} pods/node     │ Pending   : {pending_pods}                   │
+│                               │ Failed    : {failed_pods}                   │
+└──────────────────────────────┴──────────────────────────────┘
+```
+Node Details:
+```
+{"\n".join([f"  • {node['name']} ({node['version']}) - {node['ready']}" for node in node_details])}
+```
             """
         }
     except Exception as e:

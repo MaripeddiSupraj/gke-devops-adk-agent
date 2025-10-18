@@ -38,27 +38,30 @@ def list_deployments(namespace: str = "default") -> dict:
         for dep in deployments.items:
             deployment_list.append({
                 "name": dep.metadata.name,
-                "replicas": dep.spec.replicas,
-                "ready_replicas": dep.status.ready_replicas or 0,
-                "status": "Ready" if dep.status.ready_replicas == dep.spec.replicas else "Not Ready"
+                "ready": f"{dep.status.ready_replicas or 0}/{dep.spec.replicas}",
+                "status": "✅ Ready" if dep.status.ready_replicas == dep.spec.replicas else "🔄 Updating"
             })
             
-        if deployment_list:
-            deploy_details = "\n".join([f"   • {dep['name']}: {dep['ready_replicas']}/{dep['replicas']} ready ({dep['status']})" for dep in deployment_list])
-        else:
-            deploy_details = "   • No deployments found"
+        # Create a formatted table
+        headers = ["STATUS", "DEPLOYMENT", "REPLICAS"]
+        deploy_table = [headers]
+        for d in deployment_list:
+            deploy_table.append([d['status'], d['name'], d['ready']])
+
+        # Simple column alignment
+        deploy_details = "\n".join(["  ".join(f"{item:<{max(len(str(row[i])) for row in deploy_table) + 2}}" for i, item in enumerate(row))) for row in deploy_table])
+
+        if not deployment_list:
+            deploy_details = "No deployments found in this namespace."
             
         return {
             "status": "success",
             "formatted_response": f"""
 🚀 **Deployments Report - {namespace} namespace**
-
-📊 **Total Deployments**: {len(deployment_list)}
-
-📋 **Deployment Status**:
+Total Deployments: {len(deployment_list)}
+```
 {deploy_details}
-
-✅ **Summary**: Found {len(deployment_list)} deployments in {namespace} namespace
+```
             """
         }
     except Exception as e:
