@@ -146,11 +146,16 @@ Agent: 📦 **Pod Status Dashboard - default namespace**
 ```
 adk_agents/
 ├── gke_devops/
-│   ├── __init__.py
-│   ├── agent.py          # Main ADK agent
-│   └── requirements.txt  # Dependencies
-├── README.md            # This file
-└── .env                 # Environment variables
+│   ├── __init__.py           # Package initialization
+│   ├── agent.py              # Main ADK agent orchestrator
+│   ├── config.py             # Kubernetes client configuration
+│   ├── cluster_health.py     # Cluster health monitoring
+│   ├── pod_monitor.py        # Pod status and lifecycle tracking
+│   ├── deployment_manager.py # Deployment oversight
+│   └── diagnostics.py        # Issue detection and troubleshooting
+├── requirements.txt          # Dependencies
+├── .gitignore               # Git ignore patterns
+└── README.md                # This file
 ```
 
 ## Configuration
@@ -164,13 +169,20 @@ KUBECONFIG=/path/to/kubeconfig
 DEFAULT_NAMESPACE=default
 ```
 
+### Modular Architecture
+The agent uses a clean modular design:
+- **agent.py**: Main ADK agent orchestrator
+- **config.py**: Kubernetes client initialization
+- **cluster_health.py**: Infrastructure and workload monitoring
+- **pod_monitor.py**: Detailed pod status with container metrics
+- **deployment_manager.py**: Deployment status and replica tracking
+- **diagnostics.py**: Intelligent issue detection and recommendations
+
 ### Agent Configuration
-The agent is configured in `agent.py`:
 - **Model**: `gemini-2.0-flash`
-- **Tools**: 4 enhanced Kubernetes functions with dashboard formatting
-- **Instruction**: Professional DevOps assistant with detailed insights
-- **Output Format**: Dashboard-style with emojis, dividers, and structured metrics
-- **Real-Time Data**: Live cluster monitoring with health percentages and detailed pod information
+- **Tools**: 4 modular Kubernetes functions with dashboard formatting
+- **Output Format**: Professional dashboard-style with emojis and dividers
+- **Real-Time Data**: Live cluster monitoring with detailed metrics
 
 ## Development
 
@@ -193,8 +205,11 @@ root_agent = Agent(
 
 ### Testing
 ```bash
-# Test agent locally
-python -c "from gke_devops.agent import root_agent; print(root_agent.name)"
+# Test modular agent
+python -c "from gke_devops import root_agent; print('✅ Agent loaded successfully')"
+
+# Test individual modules
+python -c "from gke_devops.cluster_health import check_cluster_health; print('✅ Cluster health module ready')"
 
 # Test Kubernetes connection
 kubectl get nodes
@@ -304,8 +319,9 @@ For issues and questions:
 **Built with Google ADK and Kubernetes Python Client**
 
 ### Current Status
+- **Architecture**: ✅ Modular design with separate modules
 - **Live Cluster**: `gemini-gke-cluster` in project `green-cell-474517-d5`
 - **Cluster Health**: ✅ Operational (1 node, 15 pods)
 - **Agent Status**: 🟢 Active on ADK web server (port 8080)
-- **Enhanced Features**: Dashboard-style formatting with detailed metrics
-- **Last Updated**: Enhanced pod status display with container readiness, restart counts, pod age, and node assignments
+- **Enhanced Features**: Professional dashboard formatting with detailed metrics
+- **Last Updated**: Refactored to modular architecture with clean separation of concerns
