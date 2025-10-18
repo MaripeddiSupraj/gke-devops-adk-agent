@@ -12,6 +12,7 @@ Author: GKE DevOps Team
 """
 
 from .config import k8s_v1
+from .models import Node
 from kubernetes.client.exceptions import ApiException
 
 def check_cluster_health() -> dict:
@@ -28,11 +29,18 @@ def check_cluster_health() -> dict:
         dict: Formatted cluster health dashboard with infrastructure and workload status
     """
     try:
-        # === NODE HEALTH ASSESSMENT ===
-        nodes = k8s_v1.list_node()
-        ready_nodes = sum(1 for n in nodes.items if any(c.type == "Ready" and c.status == "True" for c in n.status.conditions))
+        nodes_api = k8s_v1.list_node()
+        nodes = []
+        for n in nodes_api.items:
+            node_ready = any(c.type == "Ready" and c.status == "True" for c in n.status.conditions)
+            nodes.append(Node(
+                name=n.metadata.name,
+                status="✅ Ready" if node_ready else "❌ NotReady",
+                version=n.status.node_info.kubelet_version,
+            ))
         
-        # === POD HEALTH METRICS ===
+        ready_nodes = sum(1 for n in nodes if n.status == "✅ Ready")
+        
         pods = k8s_v1.list_pod_for_all_namespaces()
         pod_phases = [p.status.phase for p in pods.items]
         running_pods = pod_phases.count("Running")
@@ -42,7 +50,6 @@ def check_cluster_health() -> dict:
         total_pods = len(pods.items)
         pod_health_percentage = (running_pods / total_pods * 100) if total_pods > 0 else 100
 
-        # === CLUSTER STATUS DETERMINATION ===
         if failed_pods > 0:
             cluster_status = f"🔴 ATTENTION: {failed_pods} failed pod(s) detected."
         elif pending_pods > 0:
@@ -50,11 +57,9 @@ def check_cluster_health() -> dict:
         else:
             cluster_status = "🟢 EXCELLENT: All systems operational."
 
-        # === NODE DETAILS ===
         node_lines = []
-        for node in nodes.items:
-            status = "✅ Ready" if any(c.type == "Ready" and c.status == "True" for c in node.status.conditions) else "❌ NotReady"
-            node_lines.append(f"- {node.metadata.name} ({status})")
+        for node in nodes:
+            node_lines.append(f"- {node.name} ({node.status})")
         
         return {
             "status": "success",
@@ -64,7 +69,7 @@ def check_cluster_health() -> dict:
 **{cluster_status}**
 
 **Summary:**
-- **Nodes:** {ready_nodes}/{len(nodes.items)} Ready
+- **Nodes:** {ready_nodes}/{len(nodes)} Ready
 - **Pods:** {running_pods}/{total_pods} Running
 - **Health:** {pod_health_percentage:.0f}% Pods Healthy
 

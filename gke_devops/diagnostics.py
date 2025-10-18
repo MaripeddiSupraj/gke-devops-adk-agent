@@ -11,6 +11,7 @@ Author: GKE DevOps Team
 """
 
 from .config import k8s_v1
+from .models import Issue
 from kubernetes.client.exceptions import ApiException
 
 def diagnose_issues(namespace: str = "default") -> dict:
@@ -29,10 +30,10 @@ def diagnose_issues(namespace: str = "default") -> dict:
         dict: Formatted diagnostics report with issue details and recommendations
     """
     try:
-        pods = k8s_v1.list_namespaced_pod(namespace)
+        pods_api = k8s_v1.list_namespaced_pod(namespace)
         issues = []
 
-        for pod in pods.items:
+        for pod in pods_api.items:
             if pod.status.phase not in ["Running", "Succeeded"]:
                 reason = pod.status.reason
                 message = pod.status.message
@@ -51,15 +52,21 @@ def diagnose_issues(namespace: str = "default") -> dict:
                             details = f"Container {cs.name} terminated: {reason} (Exit code: {cs.state.terminated.exit_code}) - {message}"
                             break
                 
-                issues.append(
-                    f"{pod.metadata.name:<40} {pod.status.phase:<12} {reason:<20} {details}"
-                )
+                issues.append(Issue(
+                    name=pod.metadata.name,
+                    status=pod.status.phase,
+                    reason=reason or "Unknown",
+                    details=details,
+                ))
 
         if not issues:
             issue_details = "No issues detected. All pods are healthy! 🎉"
             count = 0
         else:
-            issue_details = chr(10).join(issues)
+            issue_lines = []
+            for issue in issues:
+                issue_lines.append(f"{issue.name:<40} {issue.status:<12} {issue.reason:<20} {issue.details}")
+            issue_details = chr(10).join(issue_lines)
             count = len(issues)
 
         return {

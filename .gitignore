@@ -67,4 +67,4 @@ cache/
 node_modules/
 .pytest_cache/
 .coverage
-htmlcov/
+htmlcov/.env
